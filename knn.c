@@ -3,6 +3,7 @@
 #include <mpi.h>
 #include <cblas.h>
 #include <string.h>
+#include "read_huge.h"
 
 #define min(x,y) (((x) < (y)) ? (x) : (y))
 #define M 10
@@ -39,35 +40,13 @@ void print_formated(double *X, int rows, int cols);
 
 int main(int argc, int *argv[]){
 	int flag = 1;
-    //open a file pointer
-	FILE *fp = fopen("test.txt", "r");
-    if(fp == NULL){
-      perror("File not found");
-      return 1;
-    }
+    
 	//allocate mem for X, Y and 
     double *X = (double*)malloc(M * D *sizeof(double*));
     double *Y = (double*)malloc(N * D * sizeof(double*));
 	double *Dist = (double*)malloc(N * N * sizeof(double*));
 	
-	//Start reading file
-    char line[256];
-    int line_num = 0;
-    
-    while(fgets(line, sizeof(line),fp)){
-      	char* tokens[D];
-      	line[strcspn(line, "\n")] = '\0';
-      	char* token = strtok(line, " ");
-      	int i = 0;
-      	while (token != NULL) {
-        	tokens[i] = token;
-			X[line_num * D + i] = atof(token);
-			i++;
-        	token = strtok(NULL, " ");
-      	}
-      
-      	line_num++;
-    }
+	read_d(X, D);
 
 	//copy X to Y
 	if(flag){
@@ -122,7 +101,7 @@ void e_distance(double *X, double *Y, double *Dist){
 	}
 	
 	printf("Distance squared results:\n");
-	prinf_formated(Dist, M, N);
+	print_formated(Dist, M, N);
 }
 
 
