@@ -3,6 +3,7 @@
 #include <mpi.h>
 #include <cblas.h>
 #include <string.h>
+#include <assert.h>	
 #include "read_huge.h"
 
 #define min(x,y) (((x) < (y)) ? (x) : (y))
@@ -37,54 +38,101 @@ void e_distance(double *X, double *Y, double *ED);
 void f_distance(double *X, double *Y, double *ED);
 void init_dist(double *X, double *Y, double *Dist);
 void print_formated(double *X, int rows, int cols);
+void calc_xsqr(double *X, double *Xsq);
 
 int main(int argc, int *argv[]){
 	int flag = 1;
     
 	//allocate mem for X, Y and 
-    double *X = (double*)malloc(M * D *sizeof(double*));
+    double *X = (double*)malloc(M * D * sizeof(double*));
     double *Y = (double*)malloc(N * D * sizeof(double*));
 	double *Dist = (double*)malloc(N * N * sizeof(double*));
-	
+	double *Xsq = (double*)malloc(M * sizeof(double*));
+	double *Ysq = (double*)malloc(N * sizeof(double*));
+	double *Dist_diagnostic = (double*)malloc(M * N * sizeof(double*));
+
+	//TODO read from specific line (maybe implement using fseek())
 	read_d(X, D);
 
-	//copy X to Y
+	//copy X to Y (probably do it on first run only)
+	//TODO block corpus Y so MxN doesn't explode
 	if(flag){
 		memcpy(Y, X, M*D*sizeof(double*));
 	}
+
 	
-	//e_distance(X, Y, Dist);
+  	double start_time = MPI_Wtime();
+
+
+	//printf("Original Data Point Set:");
+	//print_formated(X, M, D);
+	
+	//calculate element-wise square of X and Y
+	calc_xsqr(X, Xsq);
+	calc_xsqr(Y, Ysq);
+
+	//initiliase D 
+	init_dist(Xsq, Ysq, Dist);
+	
+	//blas matrix-matrix calc -2 * X x (Y)T and adds it to D
 	f_distance(X, Y, Dist);
-	//debug fun
-	printf("Openblas results:\n");
-	print_formated(Dist, M, N);
 	
+	//performance metrics
+	double end_time = MPI_Wtime();
+  	double elapsed_time = end_time - start_time;
+  	printf("Smart Elapsed time: %f seconds\n", elapsed_time);
+	
+	printf("Openblas results:");
+	print_formated(Dist, M, N);
+
+	start_time = MPI_Wtime();
+	//diagnostics with triple loop dumb method 
+	e_distance(X, Y, Dist_diagnostic);
+	
+	end_time = MPI_Wtime();
+	elapsed_time = end_time - start_time;
+	printf("Dumb Elapsed time: %f seconds \n", elapsed_time);
+
 	free(X);
 	free(Y);
 	free(Dist);
 }
 
 void print_formated(double *X, int rows, int cols){
+	printf("\n");
 	for(int i=0;i<rows;i++){
 		for(int j=0;j<cols;j++){
-			printf("%.2lf ", X[i*cols+j]);
+			printf("%.4lf ", X[i*cols+j]);
 		}
 		printf("\n");
 	}
+	printf("\n");
 }
 
-void init_dist(double *X, double *Y, double *Dist){
+void init_dist(double *Xsq, double *Ysq, double *Dist){
 	for(int i=0;i<M;i++){
 		for(int j=0;j<N;j++){
-			Dist[i*M+j] = X[i*M+j] * X[i*M+j] + Y[i*N+j] * Y[i*N+j];
+			Dist[i*N+j] = Xsq[i] + Ysq[j];
 		}
+	}
+}
+
+void calc_xsqr(double *X, double *Xsq){
+	for(int i=0;i<M;i++){
+		double sum=0.0;
+		for(int j=0;j<D;j++){
+			sum += X[i*D+j] * X[i*D+j];
+		}
+		Xsq[i] = sum;
 	}
 }
 
 void f_distance(double *X, double *Y, double *Dist){
 	//supposedly 1.0*X*Y -2.0*C -> C (if dimensionality resolved properly)
-	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, 
-				M, N, D, 1.0, X, D, Y, D, -2.0, Dist, N);
+	//cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, 
+	//			M, N, D, 1.0, X, D, Y, D, 0.0, Dist, N);
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+				 M, N, D, -2.0, X, D, Y, D, 1.0, Dist, N);
 }
 
 
@@ -100,7 +148,7 @@ void e_distance(double *X, double *Y, double *Dist){
     	}
 	}
 	
-	printf("Distance squared results:\n");
+	printf("Diagnostics final results:\n");
 	print_formated(Dist, M, N);
 }
 

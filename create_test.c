@@ -5,7 +5,7 @@
 int main(int argc, int **argv){
     int N = atoi(argv[1]);
     int D = atoi(argv[2]);
-    if(argc!=3){
+    if(argc<3){
         printf("pass args dummy :)");
         return 0;
     }
@@ -17,7 +17,7 @@ int main(int argc, int **argv){
     }
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < D; j++) {
-            double x = (double)rand()*100 / RAND_MAX;
+            double x = (double)rand() / RAND_MAX;
             fprintf(fp, "%.2f ", x);
         }
         fprintf(fp, "\n");
