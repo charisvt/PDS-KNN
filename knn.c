@@ -13,6 +13,7 @@
 size_t M = 10000;
 size_t D = 30;
 size_t N = 10000;
+size_t k = 17;
 
 // Definition of the kNN result struct
 typedef struct knnresult{
@@ -61,9 +62,6 @@ int main(int argc, int *argv[]){
 	//allocate mem for X, Y and 
     double *X = (double*)MallocOrDie(M * D * sizeof(double*));
     double *Y = (double*)MallocOrDie(N * D * sizeof(double*));
-	double *Dist = (double*)MallocOrDie(N * N * sizeof(double*));
-	double *Xsq = (double*)MallocOrDie(M * sizeof(double*));
-	double *Ysq = (double*)MallocOrDie(N * sizeof(double*));
 	//double *Dist_diagnostic = (double*)MallocOrDie(M * N * sizeof(double*));
 
 	//TODO read from specific line (maybe implement using fseek() )
@@ -82,40 +80,29 @@ int main(int argc, int *argv[]){
 	//printf("Original Data Point Set:");
 	//print_formated(X, M, D);
 	
-	//calculate element-wise square of X and Y
-	calc_xsqr(X, Xsq);
-	calc_xsqr(Y, Ysq);
-
-	//initiliase D 
-	init_dist(Xsq, Ysq, Dist);
-	
-	//blas matrix-matrix calc -2 * X x (Y)T and adds it to D
-	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
-				 M, N, D, -2.0, X, D, Y, D, 1.0, Dist, N);
-
 	//performance metrics
-	double end_time = MPI_Wtime();
-  	double elapsed_time = end_time - start_time;
-  	printf("Smart Elapsed time: %f seconds\n", elapsed_time);
 	
 	//printf("Openblas results:");
 	//print_formated(Dist, M, N);
 
-	start_time = MPI_Wtime();
+	//start_time = MPI_Wtime();
 	//diagnostics with triple loop dumb method 
-	e_distance(X, Y, Dist);
+	//e_distance(X, Y, Dist);
 	//printf("Diagnostics final results:\n");
 	//print_formated(Dist, M, N);
 
-	end_time = MPI_Wtime();
-	elapsed_time = end_time - start_time;
-	printf("Dumb Elapsed time: %f seconds \n", elapsed_time);
+	//end_time = MPI_Wtime();
+	//elapsed_time = end_time - start_time;
+	//printf("Dumb Elapsed time: %f seconds \n", elapsed_time);
+
+	double start_time = MPI_Wtime();
+	kNN(X, Y, N, M, D, k);
+	double end_time = MPI_Wtime();
+	double elapsed_time = end_time - start_time;
+	prinft("Knn ended in %f seconds \n");
 
 	free(X);
 	free(Y);
-	free(Dist);
-	free(Xsq);
-	free(Ysq);
 	//free(Dist_diagnostic);
 }
 
@@ -164,19 +151,42 @@ void e_distance(double *X, double *Y, double *Dist){
 	}
 }
 
+//TODO implement the whole kNN algo here
+knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
+	knnresult r;
+	double *Dist = (double*)MallocOrDie(N * N * sizeof(double*));
+	double *Xsq = (double*)MallocOrDie(M * sizeof(double*));
+	double *Ysq = (double*)MallocOrDie(N * sizeof(double*));
 
-double k_select(int *arr, int n, int k)
-{
+	//calculate element-wise square of X and Y
+	calc_xsqr(X, Xsq);
+	calc_xsqr(Y, Ysq);
+
+	//initiliase D 
+	init_dist(Xsq, Ysq, Dist);
+	
+	//blas matrix-matrix calc -2 * X x (Y)T and adds it to D
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+				 M, N, D, -2.0, X, D, Y, D, 1.0, Dist, N);
+
+	double kth = k_select(Dist, M*N, k);
+
+
+	free(Dist);
+	free(Xsq);
+	free(Ysq);
+	return r;
+}
+
+double k_select(int *arr, int n, int k){
     double pivot = arr[n / 2];  // choose pivot as middle element
 
     // partition the array around the pivot
     int i = 0, j = n - 1;
-    while (i <= j)
-    {
+    while (i <= j){
         while (arr[i] < pivot) i++;
         while (arr[j] > pivot) j--;
-        if (i <= j)
-        {
+        if (i <= j){
             double temp = arr[i];
             arr[i] = arr[j];
             arr[j] = temp;
@@ -198,11 +208,9 @@ double k_select(int *arr, int n, int k)
 
 //this is a simple malloc wrapper that exits if a malloc fails
 //source https://stackoverflow.com/questions/26831981/should-i-check-if-malloc-was-successful
-static inline void *MallocOrDie(size_t MemSize)
-{
+static inline void *MallocOrDie(size_t MemSize){
     void *AllocMem = malloc(MemSize);
-    if(!AllocMem && MemSize)
-    {
+    if(!AllocMem && MemSize){
         printf("Could not allocate memory\n");
         exit(-1);
     }
