@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <omp.h>
 
 int main(int argc, int **argv){
     int N = atoi(argv[1]);
@@ -15,6 +16,7 @@ int main(int argc, int **argv){
         perror("Error opening file");
         return 1;
     }
+    #pragma omp parallel for
     for (int i = 0; i < N; i++) {
         for (int j = 0; j < D; j++) {
             double x = (double)rand() / RAND_MAX;
