@@ -1,15 +1,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <mpi.h>
+#include <omp.h>
 #include <cblas.h>
 #include <string.h>
 #include <assert.h>	
+#include <stdint.h>
 #include "read_huge.h"
 
 #define min(x,y) (((x) < (y)) ? (x) : (y))
-#define M 10
-#define D 3
-#define N 10
+
+size_t M = 10000;
+size_t D = 30;
+size_t N = 10000;
 
 // Definition of the kNN result struct
 typedef struct knnresult{
@@ -35,24 +38,36 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k);
 
 double k_select(int *arr, int n, int k);
 void e_distance(double *X, double *Y, double *ED);
-void f_distance(double *X, double *Y, double *ED);
 void init_dist(double *X, double *Y, double *Dist);
 void print_formated(double *X, int rows, int cols);
 void calc_xsqr(double *X, double *Xsq);
+static inline void *MallocOrDie(size_t MemSize);
 
 int main(int argc, int *argv[]){
+	//mpi init
+	int rank, num_procs=1;
+    //char buf[256];
+	MPI_Init(&argc, &argv);
+	//id proc
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
 	int flag = 1;
     
-	//allocate mem for X, Y and 
-    double *X = (double*)malloc(M * D * sizeof(double*));
-    double *Y = (double*)malloc(N * D * sizeof(double*));
-	double *Dist = (double*)malloc(N * N * sizeof(double*));
-	double *Xsq = (double*)malloc(M * sizeof(double*));
-	double *Ysq = (double*)malloc(N * sizeof(double*));
-	double *Dist_diagnostic = (double*)malloc(M * N * sizeof(double*));
+	//TODO BLOCK Y so that we avoid allocating big Dist
+	//if X is split on a set number of mpi procs
+	//then Mi can be really big so we have to keep Ni small
+	//to keep Mi*Yi from exploding
 
-	//TODO read from specific line (maybe implement using fseek())
-	read_d(X, D);
+	//allocate mem for X, Y and 
+    double *X = (double*)MallocOrDie(M * D * sizeof(double*));
+    double *Y = (double*)MallocOrDie(N * D * sizeof(double*));
+	double *Dist = (double*)MallocOrDie(N * N * sizeof(double*));
+	double *Xsq = (double*)MallocOrDie(M * sizeof(double*));
+	double *Ysq = (double*)MallocOrDie(N * sizeof(double*));
+	//double *Dist_diagnostic = (double*)MallocOrDie(M * N * sizeof(double*));
+
+	//TODO read from specific line (maybe implement using fseek() )
+	read_d(X, M, D, rank, num_procs);
 
 	//copy X to Y (probably do it on first run only)
 	//TODO block corpus Y so MxN doesn't explode
@@ -75,20 +90,23 @@ int main(int argc, int *argv[]){
 	init_dist(Xsq, Ysq, Dist);
 	
 	//blas matrix-matrix calc -2 * X x (Y)T and adds it to D
-	f_distance(X, Y, Dist);
-	
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+				 M, N, D, -2.0, X, D, Y, D, 1.0, Dist, N);
+
 	//performance metrics
 	double end_time = MPI_Wtime();
   	double elapsed_time = end_time - start_time;
   	printf("Smart Elapsed time: %f seconds\n", elapsed_time);
 	
-	printf("Openblas results:");
-	print_formated(Dist, M, N);
+	//printf("Openblas results:");
+	//print_formated(Dist, M, N);
 
 	start_time = MPI_Wtime();
 	//diagnostics with triple loop dumb method 
-	e_distance(X, Y, Dist_diagnostic);
-	
+	e_distance(X, Y, Dist);
+	//printf("Diagnostics final results:\n");
+	//print_formated(Dist, M, N);
+
 	end_time = MPI_Wtime();
 	elapsed_time = end_time - start_time;
 	printf("Dumb Elapsed time: %f seconds \n", elapsed_time);
@@ -96,6 +114,9 @@ int main(int argc, int *argv[]){
 	free(X);
 	free(Y);
 	free(Dist);
+	free(Xsq);
+	free(Ysq);
+	//free(Dist_diagnostic);
 }
 
 void print_formated(double *X, int rows, int cols){
@@ -110,6 +131,7 @@ void print_formated(double *X, int rows, int cols){
 }
 
 void init_dist(double *Xsq, double *Ysq, double *Dist){
+	#pragma omp parallel for
 	for(int i=0;i<M;i++){
 		for(int j=0;j<N;j++){
 			Dist[i*N+j] = Xsq[i] + Ysq[j];
@@ -118,6 +140,7 @@ void init_dist(double *Xsq, double *Ysq, double *Dist){
 }
 
 void calc_xsqr(double *X, double *Xsq){
+	#pragma omp parallel for
 	for(int i=0;i<M;i++){
 		double sum=0.0;
 		for(int j=0;j<D;j++){
@@ -127,17 +150,9 @@ void calc_xsqr(double *X, double *Xsq){
 	}
 }
 
-void f_distance(double *X, double *Y, double *Dist){
-	//supposedly 1.0*X*Y -2.0*C -> C (if dimensionality resolved properly)
-	//cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, 
-	//			M, N, D, 1.0, X, D, Y, D, 0.0, Dist, N);
-	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
-				 M, N, D, -2.0, X, D, Y, D, 1.0, Dist, N);
-}
-
-
 //dumb version (maybe works but awful performance (?))
 void e_distance(double *X, double *Y, double *Dist){
+	#pragma omp parallel for
 	for(int i=0; i<M; i++){
     	for(int j=0; j<N; j++) {
     		double sum = 0;
@@ -147,9 +162,6 @@ void e_distance(double *X, double *Y, double *Dist){
       	Dist[i * N + j] = sum;
     	}
 	}
-	
-	printf("Diagnostics final results:\n");
-	print_formated(Dist, M, N);
 }
 
 
@@ -182,4 +194,17 @@ double k_select(int *arr, int n, int k)
     // kth smallest element is pivot
     else
         return pivot;
+}
+
+//this is a simple malloc wrapper that exits if a malloc fails
+//source https://stackoverflow.com/questions/26831981/should-i-check-if-malloc-was-successful
+static inline void *MallocOrDie(size_t MemSize)
+{
+    void *AllocMem = malloc(MemSize);
+    if(!AllocMem && MemSize)
+    {
+        printf("Could not allocate memory\n");
+        exit(-1);
+    }
+    return AllocMem;
 }
