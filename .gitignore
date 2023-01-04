@@ -1,3 +1,8 @@
 knn
 create_test
 .vscode/c_cpp_properties.json
+create_grid
+knn.c
+test.txt
+knn_dataset.txt
+.vscode/settings.json

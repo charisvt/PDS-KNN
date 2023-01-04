@@ -10,9 +10,9 @@
 
 #define min(x,y) (((x) < (y)) ? (x) : (y))
 
-size_t M = 10000;
-size_t D = 30;
-size_t N = 10000;
+size_t M = 1000;
+size_t D = 3;
+size_t N = 1000;
 size_t k = 17;
 
 // Definition of the kNN result struct
@@ -37,7 +37,7 @@ typedef struct knnresult{
 */
 knnresult kNN(double * X, double * Y, int n, int m, int d, int k);
 
-double k_select(int *arr, int n, int k);
+double k_select(double *arr, int *nidx, int n, int k);
 void e_distance(double *X, double *Y, double *ED);
 void init_dist(double *X, double *Y, double *Dist);
 void print_formated(double *X, int rows, int cols);
@@ -82,9 +82,6 @@ int main(int argc, int *argv[]){
 	
 	//performance metrics
 	
-	//printf("Openblas results:");
-	//print_formated(Dist, M, N);
-
 	//start_time = MPI_Wtime();
 	//diagnostics with triple loop dumb method 
 	//e_distance(X, Y, Dist);
@@ -95,13 +92,16 @@ int main(int argc, int *argv[]){
 	//elapsed_time = end_time - start_time;
 	//printf("Dumb Elapsed time: %f seconds \n", elapsed_time);
 
-	kNN(X, Y, N, M, D, k);
+	knnresult r = kNN(X, Y, N, M, D, k);
 	double end_time = MPI_Wtime();
 	double elapsed_time = end_time - start_time;
-	printf("Knn ended in %f seconds \n");
+	printf("Knn ended in %f seconds \n", elapsed_time);
 
 	free(X);
 	free(Y);
+	//print_formated(r.ndist, M, k);
+	free(r.ndist);
+	free(r.nidx);
 	//free(Dist_diagnostic);
 }
 
@@ -162,6 +162,13 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 	r.nidx = (int*)MallocOrDie(m * k * sizeof(int*));
 	r.ndist = (double*)MallocOrDie(m * k * sizeof(double*));
 
+	//init (global) indexes 
+	#pragma omp parallel for
+	for(int i=0;i<N;i++){
+		for(int j=0;j<){
+			r.nidx[i] = i;
+		}
+	}
 	//calculate element-wise square of X and Y
 	calc_xsqr(X, Xsq);
 	calc_xsqr(Y, Ysq);
@@ -176,9 +183,10 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 	//TODO calc and popul knnresult r
 	#pragma omp parallel for
 	for(int i=0;i<M;i++){
-		//k_select();
+		k_select(Dist + i * N, N, k); //TODO edit k_select to keep k-th order indeces too
+		memcpy(r.ndist + i * k, Dist + i, k*sizeof(double*)); //
+		memcpu(r.nidx + i * k, Dist )
 	}
-	//kth = k_select(Dist, M*N, k);
 
 
 	free(Dist);
@@ -187,8 +195,9 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 	return r;
 }
 
-double k_select(int *arr, int n, int k){
+double k_select(double *arr, int *nidx, int n, int k){
     double pivot = arr[n / 2];  // choose pivot as middle element
+    int pivot_index = nidx[n / 2];
 
     // partition the array around the pivot
     int i = 0, j = n - 1;
@@ -199,6 +208,9 @@ double k_select(int *arr, int n, int k){
             double temp = arr[i];
             arr[i] = arr[j];
             arr[j] = temp;
+            int temp_index = nidx[i];
+            nidx[i] = nidx[j];
+            nidx[j] = temp_index;
             i++;
             j--;
         }
@@ -206,14 +218,15 @@ double k_select(int *arr, int n, int k){
 
     // check if kth smallest element is in left subarray
     if (k <= j)
-        return k_select(arr, j + 1, k);
+        return k_select(arr, nidx, j + 1, k);
     // check if kth smallest element is in right subarray
     else if (k > i)
-        return k_select(arr + i, n - i, k - i);
+        return k_select(arr + i, nidx + i, n - i, k - i);
     // kth smallest element is pivot
     else
         return pivot;
 }
+
 
 //this is a simple malloc wrapper that exits if a malloc fails
 //source https://stackoverflow.com/questions/26831981/should-i-check-if-malloc-was-successful

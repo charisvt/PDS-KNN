@@ -1,6 +1,6 @@
 void read_d(double *X, int total_lines, int dim, int rank, int num_procs){
     //open a file pointer
-	FILE *fp = fopen("test.txt", "r");
+	FILE *fp = fopen("knn_dataset.txt", "r");
     if(fp == NULL){
       perror("File not found");
     }
