@@ -153,10 +153,15 @@ void e_distance(double *X, double *Y, double *Dist){
 
 //TODO implement the whole kNN algo here
 knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
-	knnresult r;
 	double *Dist = (double*)MallocOrDie(N * N * sizeof(double*));
 	double *Xsq = (double*)MallocOrDie(M * sizeof(double*));
 	double *Ysq = (double*)MallocOrDie(N * sizeof(double*));
+	double kth;
+	knnresult r;
+	r.m = m;
+	r.k = k;
+	r.nidx = (int*)MallocOrDie(m * k * sizeof(int*));
+	r.ndist = (double*)MallocOrDie(m * k * sizeof(double*));
 
 	//calculate element-wise square of X and Y
 	calc_xsqr(X, Xsq);
@@ -169,7 +174,11 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
 				 M, N, D, -2.0, X, D, Y, D, 1.0, Dist, N);
 
-	double kth = k_select(Dist, M*N, k);
+	#pragma omp parallel for
+	for(int i=0;i<M;i++){
+		k_select();
+	}
+	kth = k_select(Dist, M*N, k);
 
 
 	free(Dist);
@@ -183,9 +192,9 @@ double k_select(int *arr, int n, int k){
 
     // partition the array around the pivot
     int i = 0, j = n - 1;
-    while (i <= j){
-        while (arr[i] < pivot) i++;
-        while (arr[j] > pivot) j--;
+    while(i <= j){
+        while(arr[i] < pivot) i++;
+        while(arr[j] > pivot) j--;
         if (i <= j){
             double temp = arr[i];
             arr[i] = arr[j];
