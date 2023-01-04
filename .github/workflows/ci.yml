@@ -19,3 +19,6 @@ jobs:
     - name: Compile knn.c
       run: |
         mpicc -o knn knn.c -lopenblas -fopenmp
+    - name: Clean up
+      run: |
+        rm -f knn
