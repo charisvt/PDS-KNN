@@ -10,12 +10,11 @@ jobs:
     - uses: actions/checkout@v2
     - name: Install MPI
       run: |
-        apt-get update
-        apt-get install -y libopenmpi-dev openmpi-bin
+        sudo apt-get update
+        sudo apt-get install -y libopenmpi-dev openmpi-bin
     - name: Install OpenBLAS
       run: |
-        apt-get update
-        apt-get install -y libopenblas-dev
+        sudo apt-get install -y libopenblas-dev
     - name: Compile knn.c
       run: |
         mpicc -o knn knn.c -lopenblas -fopenmp
