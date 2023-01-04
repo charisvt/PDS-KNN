@@ -1,0 +1,21 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install MPI
+      run: |
+        apt-get update
+        apt-get install -y libopenmpi-dev openmpi-bin
+    - name: Install OpenBLAS
+      run: |
+        apt-get update
+        apt-get install -y libopenblas-dev
+    - name: Compile knn.c
+      run: |
+        mpicc -o knn knn.c -lopenblas -fopenmp
