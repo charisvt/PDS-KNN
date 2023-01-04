@@ -98,7 +98,7 @@ int main(int argc, int *argv[]){
 	kNN(X, Y, N, M, D, k);
 	double end_time = MPI_Wtime();
 	double elapsed_time = end_time - start_time;
-	prinft("Knn ended in %f seconds \n");
+	printf("Knn ended in %f seconds \n");
 
 	free(X);
 	free(Y);
