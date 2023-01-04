@@ -95,7 +95,6 @@ int main(int argc, int *argv[]){
 	//elapsed_time = end_time - start_time;
 	//printf("Dumb Elapsed time: %f seconds \n", elapsed_time);
 
-	double start_time = MPI_Wtime();
 	kNN(X, Y, N, M, D, k);
 	double end_time = MPI_Wtime();
 	double elapsed_time = end_time - start_time;
@@ -174,11 +173,12 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
 				 M, N, D, -2.0, X, D, Y, D, 1.0, Dist, N);
 
+	//TODO calc and popul knnresult r
 	#pragma omp parallel for
 	for(int i=0;i<M;i++){
-		k_select();
+		//k_select();
 	}
-	kth = k_select(Dist, M*N, k);
+	//kth = k_select(Dist, M*N, k);
 
 
 	free(Dist);
