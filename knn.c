@@ -41,7 +41,7 @@ double k_select(double *arr, int *nidx, int n, int k);
 void e_distance(double *X, double *Y, double *ED);
 void init_dist(double *X, double *Y, double *Dist);
 void print_formated(double *X, int rows, int cols);
-void calc_xsqr(double *X, double *Xsq);
+void calc_sqr(double *X, double *Xsq);
 static inline void *MallocOrDie(size_t MemSize);
 
 int main(int argc, int *argv[]){
@@ -125,7 +125,7 @@ void init_dist(double *Xsq, double *Ysq, double *Dist){
 	}
 }
 
-void calc_xsqr(double *X, double *Xsq){
+void calc_sqr(double *X, double *Xsq){
 	#pragma omp parallel for
 	for(int i=0;i<M;i++){
 		double sum=0.0;
@@ -136,7 +136,7 @@ void calc_xsqr(double *X, double *Xsq){
 	}
 }
 
-//dumb version (maybe works but awful performance (?))
+//dumb version (awful performance)
 void e_distance(double *X, double *Y, double *Dist){
 	#pragma omp parallel for
 	for(int i=0; i<M; i++){
@@ -161,17 +161,12 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 	r.k = k;
 	r.nidx = (int*)MallocOrDie(m * k * sizeof(int*));
 	r.ndist = (double*)MallocOrDie(m * k * sizeof(double*));
+	int *ids = (int*)MallocOrDie(N * sizeof(int*));
 
 	//init (global) indexes 
-	#pragma omp parallel for
-	for(int i=0;i<N;i++){
-		for(int j=0;j<){
-			r.nidx[i] = i;
-		}
-	}
 	//calculate element-wise square of X and Y
-	calc_xsqr(X, Xsq);
-	calc_xsqr(Y, Ysq);
+	calc_sqr(X, Xsq);
+	calc_sqr(Y, Ysq);
 
 	//initiliase D 
 	init_dist(Xsq, Ysq, Dist);
@@ -183,9 +178,18 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 	//TODO calc and popul knnresult r
 	#pragma omp parallel for
 	for(int i=0;i<M;i++){
-		k_select(Dist + i * N, N, k); //TODO edit k_select to keep k-th order indeces too
-		memcpy(r.ndist + i * k, Dist + i, k*sizeof(double*)); //
-		memcpu(r.nidx + i * k, Dist )
+		//init indexes
+		
+		for(int j=0;j<N;j++){
+			ids[j] = j;
+		}
+
+		//pointer arithmetics big brainz go brr	
+		//k_select(Dist + i * N, ids, N, k); //TODO edit k_select to keep k-th order indeces too
+		//memcpy(r.ndist + i * k, Dist + i, k * sizeof(double*)); //
+		//memcpy(r.nidx + i * k, ids, k * sizeof(int*));
+
+		free(ids);
 	}
 
 
