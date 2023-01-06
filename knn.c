@@ -77,22 +77,9 @@ int main(int argc, int *argv[]){
 	
   	double start_time = MPI_Wtime();
 
-
-	//printf("Original Data Point Set:");
-	//print_formated(X, M, D);
 	
 	//performance metrics
 	
-	//start_time = MPI_Wtime();
-	//diagnostics with triple loop dumb method 
-	//e_distance(X, Y, Dist);
-	//printf("Diagnostics final results:\n");
-	//print_formated(Dist, M, N);
-
-	//end_time = MPI_Wtime();
-	//elapsed_time = end_time - start_time;
-	//printf("Dumb Elapsed time: %f seconds \n", elapsed_time);
-
 	knnresult r = kNN(X, Y, N, M, D, k);
 	double end_time = MPI_Wtime();
 	double elapsed_time = end_time - start_time;
