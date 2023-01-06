@@ -2,8 +2,8 @@
 #include <stdlib.h>
 
 #define NUM_FEATURES 3
-#define MIN_COORDINATE -300
-#define MAX_COORDINATE 300
+#define MIN_COORDINATE -10
+#define MAX_COORDINATE 10
 #define GRID_STEP 2
 
 int main(int argc, char** argv) {

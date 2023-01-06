@@ -10,9 +10,9 @@
 
 #define min(x,y) (((x) < (y)) ? (x) : (y))
 
-size_t M = 1000;
+size_t M = 1331;
 size_t D = 3;
-size_t N = 1000;
+size_t N = 1331;
 size_t k = 17;
 
 // Definition of the kNN result struct
@@ -43,6 +43,7 @@ void init_dist(double *X, double *Y, double *Dist);
 void print_formated(double *X, int rows, int cols);
 void calc_sqr(double *X, double *Xsq);
 static inline void *MallocOrDie(size_t MemSize);
+void print_knnr(knnresult *r);
 
 int main(int argc, int *argv[]){
 	//mpi init
@@ -97,6 +98,7 @@ int main(int argc, int *argv[]){
 	double elapsed_time = end_time - start_time;
 	printf("Knn ended in %f seconds \n", elapsed_time);
 
+	print_knnr(&r);
 	free(X);
 	free(Y);
 	//print_formated(r.ndist, M, k);
@@ -161,38 +163,38 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 	r.k = k;
 	r.nidx = (int*)MallocOrDie(m * k * sizeof(int*));
 	r.ndist = (double*)MallocOrDie(m * k * sizeof(double*));
+	//allocate vector of size N to keep track of indexes as we swap distances in k_select
 	int *ids = (int*)MallocOrDie(N * sizeof(int*));
-
-	//init (global) indexes 
+ 
 	//calculate element-wise square of X and Y
 	calc_sqr(X, Xsq);
 	calc_sqr(Y, Ysq);
 
-	//initiliase D 
+	//initiliase Dist
 	init_dist(Xsq, Ysq, Dist);
 	
 	//blas matrix-matrix calc -2 * X x (Y)T and adds it to D
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
 				 M, N, D, -2.0, X, D, Y, D, 1.0, Dist, N);
 
-	//TODO calc and popul knnresult r
+	//TODO calc and populate knnresult r
 	#pragma omp parallel for
 	for(int i=0;i<M;i++){
-		//init indexes
+		//TODO init indexes according to global indexes
+		//should be sth like g_idx = BlockID * BlockSize + j 
 		
 		for(int j=0;j<N;j++){
 			ids[j] = j;
 		}
 
 		//pointer arithmetics big brainz go brr	
-		//k_select(Dist + i * N, ids, N, k); //TODO edit k_select to keep k-th order indeces too
-		//memcpy(r.ndist + i * k, Dist + i, k * sizeof(double*)); //
-		//memcpy(r.nidx + i * k, ids, k * sizeof(int*));
+		k_select(Dist + i * N, ids, N, k);
+		memcpy(r.ndist + i * k, Dist + i, k * sizeof(double*)); //
+		memcpy(r.nidx + i * k, ids, k * sizeof(int*));
 
-		free(ids);
 	}
 
-
+	free(ids);
 	free(Dist);
 	free(Xsq);
 	free(Ysq);
@@ -200,19 +202,19 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 }
 
 double k_select(double *arr, int *nidx, int n, int k){
-    double pivot = arr[n / 2];  // choose pivot as middle element
-    int pivot_index = nidx[n / 2];
-
-    // partition the array around the pivot
+    double pivot = arr[n / 2], temp_dist;  // choose pivot as middle element
+    int pivot_index = nidx[n / 2], temp_index;
+    
+	// partition the array around the pivot
     int i = 0, j = n - 1;
     while(i <= j){
         while(arr[i] < pivot) i++;
         while(arr[j] > pivot) j--;
         if (i <= j){
-            double temp = arr[i];
+            temp_dist = arr[i];
             arr[i] = arr[j];
-            arr[j] = temp;
-            int temp_index = nidx[i];
+            arr[j] = temp_dist;
+            temp_index = nidx[i];
             nidx[i] = nidx[j];
             nidx[j] = temp_index;
             i++;
@@ -241,4 +243,20 @@ static inline void *MallocOrDie(size_t MemSize){
         exit(-1);
     }
     return AllocMem;
+}
+
+void print_knnr(knnresult *r){
+	//print the knns for the first 10 points
+	printf("KNN Results:\n");
+	for(int i=0;i<10;i++){
+		printf("Global ID: %d\n", i);
+		for(int j=0;j<k;j++){
+			printf("%d " , r->nidx[i * k + j]);
+		}
+		printf("\n");
+		for(int j=0;j<k;j++){
+			printf("%.2lf ", r->ndist[i * k + j]);
+		}
+		printf("\n\n");
+	}
 }

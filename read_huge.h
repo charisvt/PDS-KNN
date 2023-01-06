@@ -1,6 +1,6 @@
 void read_d(double *X, int total_lines, int dim, int rank, int num_procs){
     //open a file pointer
-	FILE *fp = fopen("test.txt", "r");
+	FILE *fp = fopen("knn_dataset.txt", "r");
     if(fp == NULL){
       perror("File not found");
     }
@@ -9,6 +9,7 @@ void read_d(double *X, int total_lines, int dim, int rank, int num_procs){
 	//and use fseek() to point to the corresponding lines 
 	//directly instead of skipping through every block of lines
 	
+	//CHECK THAT RANGES ARE CORECT - LAST MPI_PROC SHOULD READ TO EOF
 	//Start reading file
     char line[256];
     int line_num = 0;
