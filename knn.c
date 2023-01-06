@@ -10,9 +10,9 @@
 
 #define min(x,y) (((x) < (y)) ? (x) : (y))
 
-size_t M = 1331;
+size_t M = 8000;
 size_t D = 3;
-size_t N = 1331;
+size_t N = 8000;
 size_t k = 17;
 
 // Definition of the kNN result struct
@@ -61,8 +61,8 @@ int main(int argc, int *argv[]){
 	//to keep Mi*Yi from exploding
 
 	//allocate mem for X, Y and 
-    double *X = (double*)MallocOrDie(M * D * sizeof(double*));
-    double *Y = (double*)MallocOrDie(N * D * sizeof(double*));
+    double *X = (double*)MallocOrDie(M * D * sizeof(double));
+    double *Y = (double*)MallocOrDie(N * D * sizeof(double));
 	//double *Dist_diagnostic = (double*)MallocOrDie(M * N * sizeof(double*));
 
 	//TODO read from specific line (maybe implement using fseek() )
@@ -71,7 +71,7 @@ int main(int argc, int *argv[]){
 	//copy X to Y (probably do it on first run only)
 	//TODO block corpus Y so MxN doesn't explode
 	if(flag){
-		memcpy(Y, X, M*D*sizeof(double*));
+		memcpy(Y, X, M*D*sizeof(double));
 	}
 
 	
@@ -111,7 +111,7 @@ void print_formated(double *X, int rows, int cols){
 	printf("\n");
 	for(int i=0;i<rows;i++){
 		for(int j=0;j<cols;j++){
-			printf("%.4lf ", X[i*cols+j]);
+			printf("%.0lf ", X[i*cols+j]);
 		}
 		printf("\n");
 	}
@@ -154,17 +154,17 @@ void e_distance(double *X, double *Y, double *Dist){
 
 //TODO implement the whole kNN algo here
 knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
-	double *Dist = (double*)MallocOrDie(N * N * sizeof(double*));
-	double *Xsq = (double*)MallocOrDie(M * sizeof(double*));
-	double *Ysq = (double*)MallocOrDie(N * sizeof(double*));
+	double *Dist = (double*)MallocOrDie(N * N * sizeof(double));
+	double *Xsq = (double*)MallocOrDie(M * sizeof(double));
+	double *Ysq = (double*)MallocOrDie(N * sizeof(double));
 	double kth;
 	knnresult r;
 	r.m = m;
 	r.k = k;
-	r.nidx = (int*)MallocOrDie(m * k * sizeof(int*));
-	r.ndist = (double*)MallocOrDie(m * k * sizeof(double*));
+	r.nidx = (int*)MallocOrDie(m * k * sizeof(int));
+	r.ndist = (double*)MallocOrDie(m * k * sizeof(double));
 	//allocate vector of size N to keep track of indexes as we swap distances in k_select
-	int *ids = (int*)MallocOrDie(N * sizeof(int*));
+	
  
 	//calculate element-wise square of X and Y
 	calc_sqr(X, Xsq);
@@ -177,30 +177,35 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
 				 M, N, D, -2.0, X, D, Y, D, 1.0, Dist, N);
 
+	//print_formated(Dist, M, N);
 	//TODO calc and populate knnresult r
 	#pragma omp parallel for
 	for(int i=0;i<M;i++){
 		//TODO init indexes according to global indexes
-		//should be sth like g_idx = BlockID * BlockSize + j 
-		
+		//should be sth like g_idx = BlockID * BlockSize + j  
+		//this allocation is only needed cause of thread parallelism
+		//maybe its too costly and we need to do it in r.nidx
+		int *ids = (int*)MallocOrDie(N * sizeof(int));
 		for(int j=0;j<N;j++){
 			ids[j] = j;
 		}
 
 		//pointer arithmetics big brainz go brr	
 		k_select(Dist + i * N, ids, N, k);
-		memcpy(r.ndist + i * k, Dist + i, k * sizeof(double*)); //
-		memcpy(r.nidx + i * k, ids, k * sizeof(int*));
-
+		memcpy(r.ndist + i * k, Dist + i * N, k * sizeof(double)); //
+		memcpy(r.nidx + i * k, ids, k * sizeof(int));
+		free(ids);
 	}
 
-	free(ids);
 	free(Dist);
 	free(Xsq);
 	free(Ysq);
 	return r;
 }
 
+
+//k-select algorithm - k-th smallest element is at position k and every element <=k is partitioned to the left of k
+//*! keep in mind that [0-(k-1)] elements are <=k but are not sorted
 double k_select(double *arr, int *nidx, int n, int k){
     double pivot = arr[n / 2], temp_dist;  // choose pivot as middle element
     int pivot_index = nidx[n / 2], temp_index;
@@ -248,14 +253,14 @@ static inline void *MallocOrDie(size_t MemSize){
 void print_knnr(knnresult *r){
 	//print the knns for the first 10 points
 	printf("KNN Results:\n");
-	for(int i=0;i<10;i++){
+	for(int i=0;i<M;i++){
 		printf("Global ID: %d\n", i);
 		for(int j=0;j<k;j++){
 			printf("%d " , r->nidx[i * k + j]);
 		}
 		printf("\n");
 		for(int j=0;j<k;j++){
-			printf("%.2lf ", r->ndist[i * k + j]);
+			printf("%.0lf ", r->ndist[i * k + j]);
 		}
 		printf("\n\n");
 	}
