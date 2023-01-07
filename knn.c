@@ -24,7 +24,7 @@
 //void print_knnr(knnresult *r);
 //void update_knnresult(knnresult *r, knnresult *new);
 
-int main(int argc, int *argv[]){
+int main(int argc, char *argv[]){
 	//mpi init
 	int rank, world_size=1, first_run = 1;
 	MPI_Init(&argc, &argv);
