@@ -1,4 +1,4 @@
-void read_d(double *X, int total_lines, int dim, int rank, int num_procs){
+size_t read_d(double *X, int total_lines, int dim, int rank, int num_procs){
     //open a file pointer
 	FILE *fp = fopen("knn_dataset.txt", "r");
     if(fp == NULL){
@@ -12,7 +12,7 @@ void read_d(double *X, int total_lines, int dim, int rank, int num_procs){
 	//CHECK THAT RANGES ARE CORECT - LAST MPI_PROC SHOULD READ TO EOF
 	//Start reading file
     char line[256];
-    int line_num = 0;
+    size_t line_num = 0;
     int low_bound = (total_lines / num_procs)*rank;
 	int up_bound = (total_lines / num_procs)*(rank+1);
     while(fgets(line, sizeof(line), fp)){
@@ -31,4 +31,32 @@ void read_d(double *X, int total_lines, int dim, int rank, int num_procs){
 		}
       	line_num++;
     }
+	//returns how many lines were read
+	return line_num;
+}
+
+
+void print_formated(double *X, int rows, int cols){
+	printf("\n");
+	for(int i=0;i<rows;i++){
+		for(int j=0;j<cols;j++){
+			printf("%.0lf ", X[i*cols+j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+}
+
+//dumb version (awful performance)
+void e_distance(double *X, double *Y, double *Dist, int M, int N, int D){
+	#pragma omp parallel for
+	for(int i=0; i<M; i++){
+    	for(int j=0; j<N; j++) {
+    		double sum = 0;
+      		for (int k = 0; k < D; k++) {
+        		sum += (X[i * D + k] - Y[j * D + k]) * (X[i * D + k] - Y[j * D + k]);
+      		}
+      	Dist[i * N + j] = sum;
+    	}
+	}
 }

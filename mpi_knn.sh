@@ -5,8 +5,8 @@
 #SBATCH --time=1:00:00
 # module load gcc/9.2.0 openmpi/4.0.3
 
-module load gcc openmpi
+module load gcc openmpi openblas
 
-mpicc example.c -lblas -o example
+mpicc -o knn knn.c -lopenblas -fopenmp -O3
 
 srun ./example
