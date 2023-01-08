@@ -138,6 +138,7 @@ void print_knnr(knnresult *r){
 }
 
 void update_knnresult(knnresult *r, knnresult *new){
+	#pragma omp parallel for
 	for (int i = 0; i < r->m; i++){
 		for (int j = 0; j < r->k; j++){
 			int idx = i * r->k + j;  // index of current element in ndist and nidx arrays
