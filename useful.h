@@ -1,20 +1,29 @@
-size_t read_d(double *X, int total_lines, int dim, int rank, int num_procs){
+int read_d(double *X, int total_lines, int dim, int rank, int num_procs){
     //open a file pointer
 	FILE *fp = fopen("knn_dataset.txt", "r");
     if(fp == NULL){
-      perror("File not found");
+      exit(-1);
     }
     
-	//TODO maybe find a way to calculate a proper offset
-	//and use fseek() to point to the corresponding lines 
-	//directly instead of skipping through every block of lines
-	
 	//CHECK THAT RANGES ARE CORECT - LAST MPI_PROC SHOULD READ TO EOF
 	//Start reading file
     char line[256];
-    size_t line_num = 0;
-    int low_bound = (total_lines / num_procs)*rank;
-	int up_bound = (total_lines / num_procs)*(rank+1);
+    int line_num = 0, block_size = total_lines / num_procs, low_bound, up_bound ;
+
+	//check if we run on a single proc
+	if(num_procs == 1){
+		up_bound = total_lines;
+	}else{
+		//if we can't split total lines perfectly into num_proc blocks
+		//allocate bigger block and have last proc get any remainding lines
+		if(total_lines % num_procs != 0){
+			block_size = total_lines / (num_procs -1);
+		}
+    	low_bound = block_size*rank;
+		up_bound = block_size*(rank+1);
+	}
+	
+	
     while(fgets(line, sizeof(line), fp)){
       	//only read lines that correspond to the mpi process 
 		if(line_num>=low_bound && line_num<up_bound){
@@ -30,6 +39,13 @@ size_t read_d(double *X, int total_lines, int dim, int rank, int num_procs){
       		}
 		}
       	line_num++;
+    }
+	//the last proc fills with points at infinity
+	if(rank == num_procs-1 && (total_lines % num_procs)!=0 && num_procs != 1){
+        int remaining = block_size - (total_lines%num_procs);
+        for(int i = 0; i < remaining*dim; i++){
+            X[line_num*dim+i] = DBL_MAX;
+        }
     }
 	//returns how many lines were read
 	return line_num;

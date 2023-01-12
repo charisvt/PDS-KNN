@@ -46,7 +46,6 @@ knnresult kNN(double * X, double * Y, int M, int N, int D, int k){
 	r.nidx = (int*)MallocOrDie(M * k * sizeof(int));
 	r.ndist = (double*)MallocOrDie(M * k * sizeof(double));
 	//allocate vector of size N to keep track of indexes as we swap distances in k_select
-	
  
 	//calculate element-wise square of X and Y
 	calc_sqr(X, Xsq, M, D);
@@ -59,8 +58,6 @@ knnresult kNN(double * X, double * Y, int M, int N, int D, int k){
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
 				 M, N, D, -2.0, X, D, Y, D, 1.0, Dist, N);
 
-	//print_formated(Dist, M, N);
-	//TODO calc and populate knnresult r
 	#pragma omp parallel for
 	for(int i=0;i<M;i++){
 		//TODO init indexes according to global indexes
@@ -72,7 +69,6 @@ knnresult kNN(double * X, double * Y, int M, int N, int D, int k){
 			ids[j] = j;
 		}
 
-		//pointer arithmetics big brainz go brr	
 		k_select(Dist + i * N, ids, N, k);
 		memcpy(r.ndist + i * k, Dist + i * N, k * sizeof(double)); //
 		memcpy(r.nidx + i * k, ids, k * sizeof(int));
@@ -138,13 +134,17 @@ void print_knnr(knnresult *r){
 }
 
 void update_knnresult(knnresult *r, knnresult *new){
-	#pragma omp parallel for
+	#pragma omp parallel for 
 	for (int i = 0; i < r->m; i++){
 		for (int j = 0; j < r->k; j++){
 			int idx = i * r->k + j;  // index of current element in ndist and nidx arrays
-			if (new->ndist[idx] < r->ndist[idx]){  // update ndist and nidx if new is smaller
-				r->ndist[idx] = new->ndist[idx];
-				r->nidx[idx] = new->nidx[idx];
+			//avoid race conditions
+			#pragma omp critical
+			{
+				if (new->ndist[idx] < r->ndist[idx]){  // update ndist and nidx if new is smaller
+					r->ndist[idx] = new->ndist[idx];
+					r->nidx[idx] = new->nidx[idx];
+				}
 			}
 		}
 	}

@@ -17,24 +17,19 @@
 #define N 8000
 #define k 17
 
-
-//knnresult kNN(double * X, double * Y, int n, int m, int d, int k);
-
-//double k_select(double *arr, int *nidx, int n, int k);
-//void print_knnr(knnresult *r);
-//void update_knnresult(knnresult *r, knnresult *new);
-
 int main(int argc, char *argv[]){
 	//mpi init
-	int rank, world_size=1, first_run = 1;
+	int rank, world_size, first_run = 1, step = 0;
 	MPI_Init(&argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+	printf("Running on %d nodes\n", world_size);
 	int next = (rank + 1) % world_size;
   	int prev = (rank - 1 + world_size) % world_size;
 
 	//BlockID can be omitted since it's calculatable but use it (for now) for simplicity
-	int BlockSize = M / world_size, BlockID = rank;
+	int BlockSize, BlockID = rank;
 
 	//TODO BLOCK Y so that we avoid allocating big Dist
 	//if X is split on a set number of mpi procs
@@ -45,29 +40,57 @@ int main(int argc, char *argv[]){
     double *X = (double*)MallocOrDie(M * D * sizeof(double));
     double *Y = (double*)MallocOrDie(N * D * sizeof(double));
 	double *Z = (double*)MallocOrDie(M * D * sizeof(double));
+	//try to avoid this temp (swap) pointer if possible
+	double* temp = Y;
+	knnresult r;
 
+	//start timing
+	MPI_Barrier(MPI_COMM_WORLD);
+	double start_time = MPI_Wtime();
+
+	printf("%d ", world_size);
 	//copy X to Y (first run only)
 	//TODO block corpus Y so MxN doesn't explode
-	if(first_run){
-		BlockSize = read_d(X, M, D, rank, world_size);
-		memcpy(Y, X, M*D*sizeof(double));
-		//start listening for next points
-	}else{
-		//start listening for next points
-		
-	}
+	while(step < world_size){
+		if(first_run){
+			BlockSize = read_d(X, M, D, rank, world_size);
+			printf("%d", BlockSize);
+			memcpy(Y, X, M*D*sizeof(double));
 
+			MPI_Request send_request;
+			MPI_Isend(Y, M * D, MPI_DOUBLE, next, 0, MPI_COMM_WORLD, &send_request);
+			
+			r = kNN(X, Y, N, M, D, k);
+			print_knnr(&r);
+			//start receiving new points to do calcs on
+			//MPI_Request rcv_request;
+			//MPI_Irecv(Z, M * D, MPI_DOUBLE, prev, 0, MPI_COMM_WORLD, &rcv_request);
+		
+			
+			//we should send 
+
+			//use this to wait for comms to complete before using z buffer
+			//int recv_end;
+			//while(!recv_end) MPI_Test(&request,&recv_end,MPI_STATUS_IGNORE);
+
+
+			first_run = 0;
+			step++;
+		}else{
+			
+		}
+	}
+	MPI_Barrier(MPI_COMM_WORLD);
 	//performance metrics
-  	double start_time = MPI_Wtime();
-	knnresult r = kNN(X, Y, N, M, D, k);
 	double end_time = MPI_Wtime();
 	double elapsed_time = end_time - start_time;
-	print_knnr(&r);
+	//
 	printf("Knn ended in %f seconds \n", elapsed_time);
 
 
 	free(X);
 	free(Y);
+	free(Z);
 	free(r.ndist);
 	free(r.nidx);
 	//mpi final
