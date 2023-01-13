@@ -89,7 +89,7 @@ int main(int argc, char *argv[]){
 		step++;
 	}
 	if(rank == 0){
-		FILE *fp = fopen("knn_results.txt", "a");
+		FILE *fp = fopen("knn_results.txt", "w");
 		if(fp == NULL){ 
 			fprintf(stderr, "Error writing to file\n");
 			exit(-1);
