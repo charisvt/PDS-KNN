@@ -6,3 +6,4 @@ knn.c
 test.txt
 knn_dataset.txt
 .vscode/settings.json
+knn_results.txt

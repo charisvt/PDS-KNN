@@ -1,3 +1,8 @@
+int calc_blocksize(int total_lines, int num_procs){
+	if(total_lines % num_procs != 0) return total_lines / (num_procs -1);
+	return total_lines / num_procs;
+}
+
 int read_d(double *X, int total_lines, int dim, int rank, int num_procs){
     //open a file pointer
 	FILE *fp = fopen("knn_dataset.txt", "r");
@@ -5,20 +10,13 @@ int read_d(double *X, int total_lines, int dim, int rank, int num_procs){
       exit(-1);
     }
     
-	//CHECK THAT RANGES ARE CORECT - LAST MPI_PROC SHOULD READ TO EOF
-	//Start reading file
     char line[256];
-    int line_num = 0, block_size = total_lines / num_procs, low_bound, up_bound ;
+    int line_num = 0, block_size = calc_blocksize(total_lines, num_procs), low_bound, up_bound ;
 
 	//check if we run on a single proc
 	if(num_procs == 1){
 		up_bound = total_lines;
 	}else{
-		//if we can't split total lines perfectly into num_proc blocks
-		//allocate bigger block and have last proc get any remainding lines
-		if(total_lines % num_procs != 0){
-			block_size = total_lines / (num_procs -1);
-		}
     	low_bound = block_size*rank;
 		up_bound = block_size*(rank+1);
 	}
@@ -51,6 +49,19 @@ int read_d(double *X, int total_lines, int dim, int rank, int num_procs){
 	return line_num;
 }
 
+void write_d(FILE *fp, double *dist, int *indeces, int m, int kn){
+	for(int i=0;i<m;i++){
+		for(int j=0;j<kn;j++) fprintf(fp, "%lf ", dist[i * kn + j]);
+		for(int j=0;j<kn;j++) fprintf(fp, "%d ", indeces[i * kn + j]);
+		fprintf(fp, "\n");
+	}
+}
+
+static inline void p_exchange(double *y, double *z){
+	double *temp = y;
+	y = z;
+	z = temp;
+}
 
 void print_formated(double *X, int rows, int cols){
 	printf("\n");
