@@ -12,10 +12,7 @@
 
 #define min(x,y) (((x) < (y)) ? (x) : (y))
 
-#define M 8000
-#define D 3
-#define N 8000
-#define k 17
+int M = 8000, D = 3, N = 8000, k = 17;
 
 int main(int argc, char *argv[]){
 	//mpi init
@@ -62,7 +59,7 @@ int main(int argc, char *argv[]){
 			MPI_Isend(Y, block_size * D, MPI_DOUBLE, next, 0, MPI_COMM_WORLD, &send_request);
 			MPI_Irecv(Z, block_size * D, MPI_DOUBLE, prev, 0, MPI_COMM_WORLD, &recv_request);
 
-			r = kNN(X, Y, block_size, block_size, D, k);
+			r = kNN(X, Y, block_size, block_size, D, k, rank);
 
 			MPI_Wait(&recv_request, &recv_status);
 			MPI_Wait(&send_request, &send_status);
@@ -81,7 +78,7 @@ int main(int argc, char *argv[]){
 			}
 
 			//new results go into q
-			q = kNN(X, Y, N, M, D, k);
+			q = kNN(X, Y, block_size, block_size, D, k, rank);
 			update_knnresult(&r, &q);
 
 			if(step < world_size - 1){

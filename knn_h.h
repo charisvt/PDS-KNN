@@ -35,7 +35,7 @@ void init_dist(double *Xsq, double *Ysq, double *Dist, int M, int N);
 double k_select(double *arr, int *nidx, int n, int k);
 
 //kNN algo here
-knnresult kNN(double * X, double * Y, int M, int N, int D, int k){
+knnresult kNN(double * X, double * Y, int M, int N, int D, int k, int rank){
 	double *Dist = (double*)MallocOrDie(N * N * sizeof(double));
 	double *Xsq = (double*)MallocOrDie(M * sizeof(double));
 	double *Ysq = (double*)MallocOrDie(N * sizeof(double));
@@ -66,7 +66,7 @@ knnresult kNN(double * X, double * Y, int M, int N, int D, int k){
 		//maybe its too costly and we need to do it in r.nidx
 		int *ids = (int*)MallocOrDie(N * sizeof(int));
 		for(int j=0;j<N;j++){
-			ids[j] = j;
+			ids[j] = rank * N + j;
 		}
 
 		k_select(Dist + i * N, ids, N, k);
