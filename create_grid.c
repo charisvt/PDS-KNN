@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Generate NUM_POINTS points on a grid
+    // Generate points on a regular grid
     for (double i = MIN_COORDINATE; i <= MAX_COORDINATE; i += GRID_STEP) {
         for (double j = MIN_COORDINATE; j <= MAX_COORDINATE; j += GRID_STEP) {
             for(double k = MIN_COORDINATE; k <= MAX_COORDINATE; k += GRID_STEP){
