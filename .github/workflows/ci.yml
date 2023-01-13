@@ -18,7 +18,7 @@ jobs:
     - name: Compile knn.c
       run: |
         mpicc -o knn knn.c -lopenblas -fopenmp
-    - name: Comple grid
+    - name: Compile grid
       run: |
         gcc -o create_grid create_grid.c
     - name: Run
