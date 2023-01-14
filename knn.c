@@ -93,6 +93,7 @@ int main(int argc, char *argv[]){
 			MPI_Recv(r.ndist, block_size * k, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			MPI_Recv(r.nidx, block_size * k, MPI_INT, i, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			write_d(fp, r.ndist, r.nidx, block_size, k);
+			if(i==1) print_knnr(&r);
 		}
 	}else{
 		//(buf, size, type, dest, tag, com_group)

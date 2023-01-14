@@ -121,7 +121,7 @@ double k_select(double *ndist, int *nidx, int n, int k){
 void print_knnr(knnresult *r){
 	//print the knns for the first 10 points
 	fprintf(stdout, "KNN Results:\n");
-	for(int i=0;i<r->m;i++){
+	for(int i=0;i<r->m / 4;i++){
 		fprintf(stdout, "Global ID: %d\n", i);
 		for(int j=0;j<r->k;j++){
 			fprintf(stdout, "%d " , r->nidx[i * r->k + j]);
