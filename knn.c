@@ -14,14 +14,11 @@
 int main(int argc, char *argv[]){
 	//mpi init
 	int M = atoi(argv[1]), D = atoi(argv[2]), k = atoi(argv[3]);
-	int rank, world_size, step = 0, lock = 0;
+	int rank, world_size, step = 0;
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	MPI_Win win;
-	MPI_Win_create(&lock, sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &win);
-	MPI_Barrier(MPI_COMM_WORLD);
 
 	if(rank == 0) fprintf(stdout, "Running on %d nodes\n", world_size);
 	int next = (rank + 1) % world_size;
@@ -58,16 +55,8 @@ int main(int argc, char *argv[]){
 	while(step < world_size){
 		if(step==0){
 			//sequential reads with simple mutual exclusion just in case
-			while(1){
-				if(lock == 0) {
-	        		MPI_Win_lock(MPI_LOCK_EXCLUSIVE, rank, 0, win);
-					lock = 1;
-					read_d(X, block_size, D, rank, world_size);
-					lock = 0;
-					MPI_Win_unlock(rank, win);
-					break;
-				}
-			}
+
+			read_d(X, block_size, D, rank, world_size);
 			// if(rank == 1) print_formated(X, block_size, D);
 			memcpy(Y, X, block_size * D * sizeof(double));
 
@@ -154,6 +143,5 @@ int main(int argc, char *argv[]){
 	free(q.ndist);
 	free(q.nidx);
 	//mpi final
-	MPI_Win_free(&win);
 	MPI_Finalize();
 }
