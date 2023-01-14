@@ -39,6 +39,7 @@ knnresult kNN(double * X, double * Y, int M, int N, int D, int k, int block_id){
 	double *Dist = (double*)MallocOrDie(N * N * sizeof(double));
 	double *Xsq = (double*)MallocOrDie(M * sizeof(double));
 	double *Ysq = (double*)MallocOrDie(N * sizeof(double));
+	int *ids = (int*)MallocOrDie(N * sizeof(int));
 
 	knnresult r;
 	r.m = M;
@@ -62,19 +63,19 @@ knnresult kNN(double * X, double * Y, int M, int N, int D, int k, int block_id){
 	for(int i=0;i<M;i++){
 		//this allocation is only needed cause of thread parallelism
 		//maybe its too costly and we need to do it in r.nidx
-		int *ids = (int*)MallocOrDie(N * sizeof(int));
+		#pragma omp critical
 		for(int j=0;j<N;j++){
 			ids[j] = block_id * N + j;
 		}
 
 		//maybe this fixes the race condition bug
-		#pragma omp critical
+
 		k_select(Dist + i * N, ids, N, k);
 		memcpy(r.ndist + i * k, Dist + i * N, k * sizeof(double)); //
 		memcpy(r.nidx + i * k, ids, k * sizeof(int));
-		free(ids);
 	}
 
+	free(ids);
 	free(Dist);
 	free(Xsq);
 	free(Ysq);
