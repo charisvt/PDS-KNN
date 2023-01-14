@@ -5,7 +5,7 @@
 #include <string.h>
 #include <assert.h>	
 #include <stdint.h>
-#include <time.h>
+#include <mpi.h>
 #include "read_huge.h"
 
 size_t M = 8000;
@@ -40,11 +40,11 @@ void e_distance(double *X, double *Y, double *ED);
 void init_dist(double *X, double *Y, double *Dist);
 void print_formated(double *X, int rows, int cols);
 void calc_sqr(double *X, double *Xsq);
-static inline void *MallocOrDie(size_t MemSize);
+static inline void *MallocOrDie(int MemSize);
 void print_knnr(knnresult *r);
 
 int main(int argc, char *argv[]){
-
+	MPI_Init(&argc, &argv);
 	int flag = 1;
     
 	//TODO BLOCK Y so that we avoid allocating big Dist
@@ -61,15 +61,13 @@ int main(int argc, char *argv[]){
 		memcpy(Y, X, M*D*sizeof(double));
 	}
 
-	
-  	clock_t start_time = clock();
-
+	double start_time = MPI_Wtime();
 	
 	//performance metrics
 	
 	knnresult r = kNN(X, Y, N, M, D, k);
-	clock_t end_time = clock();
-	double elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+	double end_time = MPI_Wtime();
+	double elapsed_time = end_time - start_time;
 	print_knnr(&r);
 	printf("Knn ended in %f seconds \n", elapsed_time);
 
@@ -156,10 +154,6 @@ knnresult kNN(double * X, double * Y, int n, int m, int d, int k){
 	//TODO calc and populate knnresult r
 	#pragma omp parallel for
 	for(int i=0;i<M;i++){
-		//TODO init indexes according to global indexes
-		//should be sth like g_idx = BlockID * BlockSize + j  
-		//this allocation is only needed cause of thread parallelism
-		//maybe its too costly and we need to do it in r.nidx
 		int *ids = (int*)MallocOrDie(N * sizeof(int));
 		for(int j=0;j<N;j++){
 			ids[j] = j;
@@ -216,7 +210,7 @@ double k_select(double *arr, int *nidx, int n, int k){
 
 //this is a simple malloc wrapper that exits if a malloc fails
 //source https://stackoverflow.com/questions/26831981/should-i-check-if-malloc-was-successful
-static inline void *MallocOrDie(size_t MemSize){
+static inline void *MallocOrDie(int MemSize){
     void *AllocMem = malloc(MemSize);
     if(!AllocMem && MemSize){
         printf("Could not allocate memory\n");
