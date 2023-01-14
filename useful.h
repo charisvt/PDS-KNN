@@ -43,9 +43,10 @@ int read_d(double *X, int total_lines, int dim, int rank, int num_procs){
 	if(rank == num_procs-1 && (total_lines % num_procs)!=0 && num_procs != 1){
         int remaining = block_size - (total_lines%num_procs);
         for(int i = 0; i < remaining*dim; i++){
-            X[line_num*dim+i] = 5.1e50;
+            X[line_num*dim+i] = 5.1e20;
         }
     }
+	fclose(fp);
 	//returns how many lines were read
 	return line_num;
 }

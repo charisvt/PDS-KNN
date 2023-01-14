@@ -14,7 +14,7 @@
 int main(int argc, char *argv[]){
 	//mpi init
 	int M = atoi(argv[1]), D = atoi(argv[2]), k = atoi(argv[3]);
-	int rank, world_size, first_run = 1, step = 0;
+	int rank, world_size, step = 0;
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -36,6 +36,11 @@ int main(int argc, char *argv[]){
     double *Y = (double*)MallocOrDie(block_size * D * sizeof(double));
 	double *Z = (double*)MallocOrDie(block_size * D * sizeof(double));
 	knnresult r, q;
+	r.ndist = (double*)MallocOrDie(M * k * sizeof(double));
+	r.nidx = (int*)MallocOrDie(M * k * sizeof(int));
+	q.ndist = (double*)MallocOrDie(M * k * sizeof(double));
+	q.nidx = (int*)MallocOrDie(M * k * sizeof(int));
+
 	MPI_Request send_request, recv_request; 
 	MPI_Status send_status, recv_status;
 	//fprintf(stdout, "Allocated main mem ok on node %d\n", rank);
@@ -44,17 +49,24 @@ int main(int argc, char *argv[]){
 	MPI_Barrier(MPI_COMM_WORLD);
 	double start_time = MPI_Wtime();
 
-	//copy X to Y (first run only)
 	//TODO block corpus Y so MxN doesn't explode
 	while(step < world_size){
-		if(first_run){
+		if(step==0){
 			read_d(X, block_size, D, rank, world_size);
+			
 			memcpy(Y, X, block_size * D * sizeof(double));
 
 			MPI_Isend(Y, block_size * D, MPI_DOUBLE, next, 0, MPI_COMM_WORLD, &send_request);
 			MPI_Irecv(Z, block_size * D, MPI_DOUBLE, prev, 0, MPI_COMM_WORLD, &recv_request);
-			r = kNN(X, Y, block_size, block_size, D, k, block_id);
+			kNN(X, Y, block_size, block_size, D, k, block_id, &r);
 
+			//debug region
+			char filename[20];
+			sprintf(filename, "debug-%d.txt", rank);
+			FILE *dbg = fopen(filename, "w");
+			write_d(dbg, r.ndist, r.nidx, block_size, k);
+			fclose(dbg);
+			//remove when done
 			MPI_Wait(&recv_request, &recv_status);
 			MPI_Wait(&send_request, &send_status);
 
@@ -64,14 +76,13 @@ int main(int argc, char *argv[]){
 			//use this to wait for comms to complete before using z buffer
 			//int recv_end;
 			//while(!recv_end) MPI_Test(&recv_request,&recv_end,MPI_STATUS_IGNORE);
-			first_run = 0;
 		}else{
 			if(step < world_size - 1){ 
 				MPI_Isend(Y, block_size * D, MPI_DOUBLE, next, 0, MPI_COMM_WORLD, &send_request);
 				MPI_Irecv(Z, block_size * D, MPI_DOUBLE, prev, 0, MPI_COMM_WORLD, &recv_request);
 			}
 			//new results go into q
-			q = kNN(X, Y, block_size, block_size, D, k, block_id);
+			kNN(X, Y, block_size, block_size, D, k, block_id, &q);
 			update_knnresult(&r, &q);
 
 			if(step < world_size - 1){
@@ -89,11 +100,14 @@ int main(int argc, char *argv[]){
 			exit(-1);
 		}
 		write_d(fp, r.ndist, r.nidx, block_size, k);
+		fclose(fp);
+		fp = fopen("knn_results.txt", "a");
 		for(int i=1; i < world_size ;i++){
 			MPI_Recv(r.ndist, block_size * k, MPI_DOUBLE, i, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			MPI_Recv(r.nidx, block_size * k, MPI_INT, i, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 			write_d(fp, r.ndist, r.nidx, block_size, k);
 		}
+		fclose(fp);
 	}else{
 		//(buf, size, type, dest, tag, com_group)
 		MPI_Send(r.ndist, block_size * k, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD);
@@ -113,8 +127,8 @@ int main(int argc, char *argv[]){
 	free(Z);
 	free(r.ndist);
 	free(r.nidx);
-	if(world_size>1) free(q.ndist);
-	if(world_size>1) free(q.nidx);
+	free(q.ndist);
+	free(q.nidx);
 	//mpi final
 	MPI_Finalize();
 }

@@ -21,7 +21,7 @@ typedef struct knnresult{
 
 //this is a simple malloc wrapper that exits if a malloc fails
 //source https://stackoverflow.com/questions/26831981/should-i-check-if-malloc-was-successful
-static inline void *MallocOrDie(size_t MemSize){
+static inline void *MallocOrDie(int MemSize){
     void *AllocMem = malloc(MemSize);
     if(!AllocMem && MemSize){
         fprintf(stdout, "Could not allocate memory\n");
@@ -35,18 +35,15 @@ void init_dist(double *Xsq, double *Ysq, double *Dist, int M, int N);
 double k_select(double *arr, int *nidx, int n, int k);
 
 //kNN algo here
-knnresult kNN(double * X, double * Y, int M, int N, int D, int k, int block_id){
+void kNN(double * X, double * Y, int M, int N, int D, int k, int block_id, knnresult* r){
 	double *Dist = (double*)MallocOrDie(N * N * sizeof(double));
 	double *Xsq = (double*)MallocOrDie(M * sizeof(double));
 	double *Ysq = (double*)MallocOrDie(N * sizeof(double));
+	//allocate vector of size N to keep track of indexes as we swap distances in k_select
 	int *ids = (int*)MallocOrDie(N * sizeof(int));
 
-	knnresult r;
-	r.m = M;
-	r.k = k;
-	r.nidx = (int*)MallocOrDie(M * k * sizeof(int));
-	r.ndist = (double*)MallocOrDie(M * k * sizeof(double));
-	//allocate vector of size N to keep track of indexes as we swap distances in k_select
+	r->m = M;
+	r->k = k;
  
 	//calculate element-wise square of X and Y
 	calc_sqr(X, Xsq, M, D);
@@ -71,15 +68,14 @@ knnresult kNN(double * X, double * Y, int M, int N, int D, int k, int block_id){
 		//maybe this fixes the race condition bug
 
 		k_select(Dist + i * N, ids, N, k);
-		memcpy(r.ndist + i * k, Dist + i * N, k * sizeof(double)); //
-		memcpy(r.nidx + i * k, ids, k * sizeof(int));
+		memcpy(r->ndist + i * k, Dist + i * N, k * sizeof(double)); //
+		memcpy(r->nidx + i * k, ids, k * sizeof(int));
 	}
 
-	free(ids);
 	free(Dist);
 	free(Xsq);
 	free(Ysq);
-	return r;
+	free(ids);
 }
 
 
