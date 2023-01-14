@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --partition=batch
-#SBATCH --ntasks-per-node=15
-#SBATCH --nodes=3
-#SBATCH --time=1:00:00
-# module load gcc/9.2.0 openmpi/4.0.3
+#SBATCH --partition=rome
+#SBATCH --ntasks-per-node=1
+#SBATCH --nodes=4
+#SBATCH --time=10:00
+#SBATCH --cpus-per-task=4
 
-module load gcc openmpi openblas
+module load gcc/10.2.0 mvapich2/2.3.4 openblas
 
-mpicc -o knn knn.c -lopenblas -fopenmp -O3
+mpicc -o knn knn.c -L/mnt/apps/aristotle/site/linux-centos7-x86_64/gcc-10.2.0/openblas-0.3.20-skoz3oyx4ekzpocbkfasvmt2oltlxh2z/lib -I/mnt/apps/aristotle/site/linux-centos7-x86_64/gcc-10.2.0/openblas-0.3.20-skoz3oyx4ekzpocbkfasvmt2oltlxh2z/include -lopenblas -fopenmp -O3
 
-srun ./example
+srun ./knn

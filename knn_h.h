@@ -24,7 +24,7 @@ typedef struct knnresult{
 static inline void *MallocOrDie(size_t MemSize){
     void *AllocMem = malloc(MemSize);
     if(!AllocMem && MemSize){
-        printf("Could not allocate memory\n");
+        fprintf(stdout, "Could not allocate memory\n");
         exit(-1);
     }
     return AllocMem;
@@ -35,11 +35,11 @@ void init_dist(double *Xsq, double *Ysq, double *Dist, int M, int N);
 double k_select(double *arr, int *nidx, int n, int k);
 
 //kNN algo here
-knnresult kNN(double * X, double * Y, int M, int N, int D, int k, int rank){
+knnresult kNN(double * X, double * Y, int M, int N, int D, int k, int block_id){
 	double *Dist = (double*)MallocOrDie(N * N * sizeof(double));
 	double *Xsq = (double*)MallocOrDie(M * sizeof(double));
 	double *Ysq = (double*)MallocOrDie(N * sizeof(double));
-	double kth;
+
 	knnresult r;
 	r.m = M;
 	r.k = k;
@@ -60,15 +60,15 @@ knnresult kNN(double * X, double * Y, int M, int N, int D, int k, int rank){
 
 	#pragma omp parallel for
 	for(int i=0;i<M;i++){
-		//TODO init indexes according to global indexes
-		//should be sth like g_idx = BlockID * BlockSize + j  
 		//this allocation is only needed cause of thread parallelism
 		//maybe its too costly and we need to do it in r.nidx
 		int *ids = (int*)MallocOrDie(N * sizeof(int));
 		for(int j=0;j<N;j++){
-			ids[j] = rank * N + j;
+			ids[j] = block_id * N + j;
 		}
 
+		//maybe this fixes the race condition bug
+		#pragma omp critical
 		k_select(Dist + i * N, ids, N, k);
 		memcpy(r.ndist + i * k, Dist + i * N, k * sizeof(double)); //
 		memcpy(r.nidx + i * k, ids, k * sizeof(int));
@@ -84,19 +84,19 @@ knnresult kNN(double * X, double * Y, int M, int N, int D, int k, int rank){
 
 //k-select algorithm - k-th smallest element is at position k and every element <=k is partitioned to the left of k
 //*! keep in mind that [0-(k-1)] elements are <=k but are not sorted !*
-double k_select(double *arr, int *nidx, int n, int k){
-    double pivot = arr[n / 2], temp_dist;  // choose pivot as middle element
-    int pivot_index = nidx[n / 2], temp_index;
+double k_select(double *ndist, int *nidx, int n, int k){
+    double pivot = ndist[n / 2], temp_dist;  // choose pivot as middle element
+    int temp_index;
     
 	// partition the array around the pivot
     int i = 0, j = n - 1;
     while(i <= j){
-        while(arr[i] < pivot) i++;
-        while(arr[j] > pivot) j--;
+        while(ndist[i] < pivot) i++;
+        while(ndist[j] > pivot) j--;
         if (i <= j){
-            temp_dist = arr[i];
-            arr[i] = arr[j];
-            arr[j] = temp_dist;
+            temp_dist = ndist[i];
+            ndist[i] = ndist[j];
+            ndist[j] = temp_dist;
             temp_index = nidx[i];
             nidx[i] = nidx[j];
             nidx[j] = temp_index;
@@ -107,10 +107,10 @@ double k_select(double *arr, int *nidx, int n, int k){
 
     // check if kth smallest element is in left subarray
     if (k <= j)
-        return k_select(arr, nidx, j + 1, k);
+        return k_select(ndist, nidx, j + 1, k);
     // check if kth smallest element is in right subarray
     else if (k > i)
-        return k_select(arr + i, nidx + i, n - i, k - i);
+        return k_select(ndist + i, nidx + i, n - i, k - i);
     // kth smallest element is pivot
     else
         return pivot;
@@ -119,17 +119,17 @@ double k_select(double *arr, int *nidx, int n, int k){
 
 void print_knnr(knnresult *r){
 	//print the knns for the first 10 points
-	printf("KNN Results:\n");
+	fprintf(stdout, "KNN Results:\n");
 	for(int i=0;i<r->m;i++){
-		printf("Global ID: %d\n", i);
+		fprintf(stdout, "Global ID: %d\n", i);
 		for(int j=0;j<r->k;j++){
-			printf("%d " , r->nidx[i * r->k + j]);
+			fprintf(stdout, "%d " , r->nidx[i * r->k + j]);
 		}
-		printf("\n");
+		fprintf(stdout, "\n");
 		for(int j=0;j<r->k;j++){
-			printf("%.0lf ", r->ndist[i * r->k + j]);
+			fprintf(stdout, "%.0lf ", r->ndist[i * r->k + j]);
 		}
-		printf("\n\n");
+		fprintf(stdout, "\n\n");
 	}
 }
 

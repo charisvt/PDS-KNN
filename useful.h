@@ -7,11 +7,12 @@ int read_d(double *X, int total_lines, int dim, int rank, int num_procs){
     //open a file pointer
 	FILE *fp = fopen("knn_dataset.txt", "r");
     if(fp == NULL){
-      exit(-1);
+		fprintf(stdout, "Error: Could not open file\n");
+		exit(-1);
     }
     
     char line[256];
-    int line_num = 0, block_size = calc_blocksize(total_lines, num_procs), low_bound, up_bound ;
+    int line_num = 0, block_size = calc_blocksize(total_lines, num_procs), low_bound = 0, up_bound ;
 
 	//check if we run on a single proc
 	if(num_procs == 1){
@@ -42,7 +43,7 @@ int read_d(double *X, int total_lines, int dim, int rank, int num_procs){
 	if(rank == num_procs-1 && (total_lines % num_procs)!=0 && num_procs != 1){
         int remaining = block_size - (total_lines%num_procs);
         for(int i = 0; i < remaining*dim; i++){
-            X[line_num*dim+i] = DBL_MAX;
+            X[line_num*dim+i] = 5.1e50;
         }
     }
 	//returns how many lines were read
@@ -64,14 +65,14 @@ static inline void p_exchange(double *y, double *z){
 }
 
 void print_formated(double *X, int rows, int cols){
-	printf("\n");
+	fprintf(stdout, "\n");
 	for(int i=0;i<rows;i++){
 		for(int j=0;j<cols;j++){
-			printf("%.0lf ", X[i*cols+j]);
+			fprintf(stdout, "%.0lf ", X[i*cols+j]);
 		}
-		printf("\n");
+		fprintf(stdout, "\n");
 	}
-	printf("\n");
+	fprintf(stdout, "\n");
 }
 
 //dumb version (awful performance)
