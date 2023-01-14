@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <mpi.h>
 #include <omp.h>
 #include <cblas.h>
 #include <string.h>
 #include <assert.h>	
 #include <stdint.h>
+#include <time.h>
 #include "read_huge.h"
-
-#define min(x,y) (((x) < (y)) ? (x) : (y))
 
 size_t M = 8000;
 size_t D = 3;
@@ -45,28 +43,17 @@ void calc_sqr(double *X, double *Xsq);
 static inline void *MallocOrDie(size_t MemSize);
 void print_knnr(knnresult *r);
 
-int main(int argc, int *argv[]){
-	//mpi init
-	int rank, num_procs=1;
-    //char buf[256];
-	MPI_Init(&argc, &argv);
-	//id proc
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+int main(int argc, char *argv[]){
 
 	int flag = 1;
     
 	//TODO BLOCK Y so that we avoid allocating big Dist
-	//if X is split on a set number of mpi procs
-	//then Mi can be really big so we have to keep Ni small
-	//to keep Mi*Yi from exploding
 
 	//allocate mem for X, Y and 
     double *X = (double*)MallocOrDie(M * D * sizeof(double));
     double *Y = (double*)MallocOrDie(N * D * sizeof(double));
-	//double *Dist_diagnostic = (double*)MallocOrDie(M * N * sizeof(double*));
 
-	//TODO read from specific line (maybe implement using fseek() )
-	read_d(X, M, D, rank, num_procs);
+	read_d(X, M, D, 0, 1);
 
 	//copy X to Y (probably do it on first run only)
 	//TODO block corpus Y so MxN doesn't explode
@@ -75,14 +62,14 @@ int main(int argc, int *argv[]){
 	}
 
 	
-  	double start_time = MPI_Wtime();
+  	clock_t start_time = clock();
 
 	
 	//performance metrics
 	
 	knnresult r = kNN(X, Y, N, M, D, k);
-	double end_time = MPI_Wtime();
-	double elapsed_time = end_time - start_time;
+	clock_t end_time = clock();
+	double elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
 	print_knnr(&r);
 	printf("Knn ended in %f seconds \n", elapsed_time);
 
