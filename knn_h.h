@@ -21,7 +21,7 @@ typedef struct knnresult{
 
 //this is a simple malloc wrapper that exits if a malloc fails
 //source https://stackoverflow.com/questions/26831981/should-i-check-if-malloc-was-successful
-static inline void *MallocOrDie(int MemSize){
+static inline void *MallocOrDie(size_t MemSize){
     void *AllocMem = malloc(MemSize);
     if(!AllocMem && MemSize){
         fprintf(stdout, "Could not allocate memory\n");
@@ -42,8 +42,6 @@ void kNN(double * X, double * Y, int M, int N, int D, int k, int block_id, knnre
 	//allocate vector of size N to keep track of indexes as we swap distances in k_select
 	int *ids = (int*)MallocOrDie(N * sizeof(int));
 
-	r->m = M;
-	r->k = k;
  
 	//calculate element-wise square of X and Y
 	calc_sqr(X, Xsq, M, D);
@@ -130,17 +128,15 @@ void print_knnr(knnresult *r){
 	}
 }
 
-void update_knnresult(knnresult *r, knnresult *new){
-	#pragma omp parallel for 
-	for (int i = 0; i < r->m; i++){
-		for (int j = 0; j < r->k; j++){
-			int idx = i * r->k + j;  // index of current element in ndist and nidx arrays
-			//avoid race conditions
-			#pragma omp critical
-			{
-				if (new->ndist[idx] < r->ndist[idx]){  // update ndist and nidx if new is smaller
-					r->ndist[idx] = new->ndist[idx];
-					r->nidx[idx] = new->nidx[idx];
+
+void update_knnresult(double *rdist, int *ridx, double *qdist, int *qidx, int m, int k){	
+	for(int i=0;i<m;i++){
+		for(int j=0;j<k;j++){
+			for(int l=0;l<k;l++){
+				if(qdist[i * k + j] < rdist[i * k + l]){
+					rdist[i * k + l] = qdist[i * k + j];
+					ridx[i * k + l] = qdist[i * k + j];
+					break;
 				}
 			}
 		}

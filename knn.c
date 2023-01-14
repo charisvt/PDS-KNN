@@ -14,10 +14,14 @@
 int main(int argc, char *argv[]){
 	//mpi init
 	int M = atoi(argv[1]), D = atoi(argv[2]), k = atoi(argv[3]);
-	int rank, world_size, step = 0;
+	int rank, world_size, step = 0, lock = 0;
+
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	MPI_Win win;
+	MPI_Win_create(&lock, sizeof(int), sizeof(int), MPI_INFO_NULL, MPI_COMM_WORLD, &win);
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	if(rank == 0) fprintf(stdout, "Running on %d nodes\n", world_size);
 	int next = (rank + 1) % world_size;
@@ -36,10 +40,11 @@ int main(int argc, char *argv[]){
     double *Y = (double*)MallocOrDie(block_size * D * sizeof(double));
 	double *Z = (double*)MallocOrDie(block_size * D * sizeof(double));
 	knnresult r, q;
-	r.ndist = (double*)MallocOrDie(M * k * sizeof(double));
-	r.nidx = (int*)MallocOrDie(M * k * sizeof(int));
-	q.ndist = (double*)MallocOrDie(M * k * sizeof(double));
-	q.nidx = (int*)MallocOrDie(M * k * sizeof(int));
+	r.k = k; r.m = block_size; q.k = k; q.m = block_size;
+	r.ndist = (double*)MallocOrDie(block_size * k * sizeof(double));
+	r.nidx = (int*)MallocOrDie(block_size * k * sizeof(int));
+	q.ndist = (double*)MallocOrDie(block_size * k * sizeof(double));
+	q.nidx = (int*)MallocOrDie(block_size * k * sizeof(int));
 
 	MPI_Request send_request, recv_request; 
 	MPI_Status send_status, recv_status;
@@ -48,18 +53,29 @@ int main(int argc, char *argv[]){
 	//start timing
 	MPI_Barrier(MPI_COMM_WORLD);
 	double start_time = MPI_Wtime();
-
+	
 	//TODO block corpus Y so MxN doesn't explode
 	while(step < world_size){
 		if(step==0){
-			read_d(X, block_size, D, rank, world_size);
-			
+			//sequential reads with simple mutual exclusion just in case
+			while(1){
+				if(lock == 0) {
+	        		MPI_Win_lock(MPI_LOCK_EXCLUSIVE, rank, 0, win);
+					lock = 1;
+					read_d(X, block_size, D, rank, world_size);
+					lock = 0;
+					MPI_Win_unlock(rank, win);
+					break;
+				}
+			}
+			// if(rank == 1) print_formated(X, block_size, D);
 			memcpy(Y, X, block_size * D * sizeof(double));
 
 			MPI_Isend(Y, block_size * D, MPI_DOUBLE, next, 0, MPI_COMM_WORLD, &send_request);
 			MPI_Irecv(Z, block_size * D, MPI_DOUBLE, prev, 0, MPI_COMM_WORLD, &recv_request);
-			kNN(X, Y, block_size, block_size, D, k, block_id, &r);
 
+			kNN(X, Y, block_size, block_size, D, k, block_id, &r);
+			// if(rank==1) print_knnr(&r);
 			//debug region
 			char filename[20];
 			sprintf(filename, "debug-%d.txt", rank);
@@ -67,9 +83,14 @@ int main(int argc, char *argv[]){
 			write_d(dbg, r.ndist, r.nidx, block_size, k);
 			fclose(dbg);
 			//remove when done
-			MPI_Wait(&recv_request, &recv_status);
-			MPI_Wait(&send_request, &send_status);
 
+			// int recv_end;
+			// while(!recv_end) MPI_Test(&recv_request,&recv_end,MPI_STATUS_IGNORE);
+			// int send_end;
+			// while(!send_end) MPI_Test(&send_request,&send_end,MPI_STATUS_IGNORE);
+			
+			MPI_Wait(&recv_request, &recv_status);
+			MPI_Wait(&send_request, &send_status);			
 			//exchange pointers
 			p_exchange(Y, Z);
 
@@ -83,8 +104,9 @@ int main(int argc, char *argv[]){
 			}
 			//new results go into q
 			kNN(X, Y, block_size, block_size, D, k, block_id, &q);
-			update_knnresult(&r, &q);
-
+			//this update function could be better
+			update_knnresult(r.ndist, r.nidx, q.ndist, q.nidx, block_size, k);
+			fprintf(stdout, "Unique debug %d\n", rank);
 			if(step < world_size - 1){
 				MPI_Wait(&recv_request, &recv_status);
 				MPI_Wait(&send_request, &send_status);
@@ -93,6 +115,8 @@ int main(int argc, char *argv[]){
 		block_id = (block_id + 1) % world_size;
 		step++;
 	}
+
+	//gather results
 	if(rank == 0){
 		FILE *fp = fopen("knn_results.txt", "w");
 		if(fp == NULL){ 
@@ -125,10 +149,11 @@ int main(int argc, char *argv[]){
 	free(X);
 	free(Y);
 	free(Z);
-	free(r.ndist);
 	free(r.nidx);
+    free(r.ndist);
 	free(q.ndist);
 	free(q.nidx);
 	//mpi final
+	MPI_Win_free(&win);
 	MPI_Finalize();
 }

@@ -3,7 +3,7 @@ int calc_blocksize(int total_lines, int num_procs){
 	return total_lines / num_procs;
 }
 
-int read_d(double *X, int total_lines, int dim, int rank, int num_procs){
+int read_d(double *X, int block_size, int dim, int rank, int num_procs){
     //open a file pointer
 	FILE *fp = fopen("knn_dataset.txt", "r");
     if(fp == NULL){
@@ -12,17 +12,16 @@ int read_d(double *X, int total_lines, int dim, int rank, int num_procs){
     }
     
     char line[256];
-    int line_num = 0, block_size = calc_blocksize(total_lines, num_procs), low_bound = 0, up_bound ;
+    int line_num = 0, low_bound = 0, up_bound;
 
 	//check if we run on a single proc
-	if(num_procs == 1){
-		up_bound = total_lines;
-	}else{
-    	low_bound = block_size*rank;
-		up_bound = block_size*(rank+1);
+
+	low_bound = block_size*rank;
+	up_bound = block_size*(rank+1);
+	
+	if(rank==1){
+		fprintf(stdout, "read got called with %d\n", block_size);
 	}
-	
-	
     while(fgets(line, sizeof(line), fp)){
       	//only read lines that correspond to the mpi process 
 		if(line_num>=low_bound && line_num<up_bound){
@@ -40,11 +39,11 @@ int read_d(double *X, int total_lines, int dim, int rank, int num_procs){
       	line_num++;
     }
 	//the last proc fills with points at infinity
-	if(rank == num_procs-1 && (total_lines % num_procs)!=0 && num_procs != 1){
-        int remaining = block_size - (total_lines%num_procs);
-        for(int i = 0; i < remaining*dim; i++){
-            X[line_num*dim+i] = 5.1e20;
-        }
+	int remaining = line_num % block_size;
+    for(int i = 0; i < remaining*dim; i++){
+        //debug
+		fprintf(stdout, "filling big numbers\n");
+		X[line_num*dim+i] = 5.1e20;
     }
 	fclose(fp);
 	//returns how many lines were read
