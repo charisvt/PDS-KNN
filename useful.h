@@ -4,7 +4,6 @@ int calc_blocksize(int total_lines, int num_procs){
 }
 
 int read_d(double *X, int block_size, int dim, int rank, int num_procs){
-    //open a file pointer
 	FILE *fp = fopen("knn_dataset.txt", "r");
     if(fp == NULL){
 		fprintf(stdout, "Error: Could not open file\n");
@@ -13,8 +12,6 @@ int read_d(double *X, int block_size, int dim, int rank, int num_procs){
     
     char line[256];
     int line_num = 0, low_bound = 0, up_bound;
-
-	//check if we run on a single proc
 
 	low_bound = block_size*rank;
 	up_bound = block_size*(rank+1);
@@ -41,12 +38,9 @@ int read_d(double *X, int block_size, int dim, int rank, int num_procs){
 	//the last proc fills with points at infinity
 	int remaining = line_num % block_size;
     for(int i = 0; i < remaining*dim; i++){
-        //debug
-		fprintf(stdout, "filling big numbers\n");
 		X[line_num*dim+i] = 5.1e20;
     }
 	fclose(fp);
-	//returns how many lines were read
 	return line_num;
 }
 
@@ -58,6 +52,7 @@ void write_d(FILE *fp, double *dist, int *indeces, int m, int kn){
 	}
 }
 
+//pointer swap
 static inline void p_exchange(double *y, double *z){
 	double *temp = y;
 	y = z;

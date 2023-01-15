@@ -39,8 +39,6 @@ void kNN(double * X, double * Y, int M, int N, int D, int k, int block_id, knnre
 	double *Dist = (double*)MallocOrDie(N * N * sizeof(double));
 	double *Xsq = (double*)MallocOrDie(M * sizeof(double));
 	double *Ysq = (double*)MallocOrDie(N * sizeof(double));
-	//allocate vector of size N to keep track of indexes as we swap distances in k_select
-	int *ids = (int*)MallocOrDie(N * sizeof(int));
 
  
 	//calculate element-wise square of X and Y
@@ -56,24 +54,23 @@ void kNN(double * X, double * Y, int M, int N, int D, int k, int block_id, knnre
 
 	#pragma omp parallel for
 	for(int i=0;i<M;i++){
+		//allocate vector of size N to keep track of indexes as we swap distances in k_select
 		//this allocation is only needed cause of thread parallelism
-		//maybe its too costly and we need to do it in r.nidx
-		#pragma omp critical
+		int *ids = (int*)MallocOrDie(N * sizeof(int));
+
 		for(int j=0;j<N;j++){
 			ids[j] = block_id * N + j;
 		}
 
-		//maybe this fixes the race condition bug
-
 		k_select(Dist + i * N, ids, N, k);
 		memcpy(r->ndist + i * k, Dist + i * N, k * sizeof(double)); //
 		memcpy(r->nidx + i * k, ids, k * sizeof(int));
+		free(ids);
 	}
 
 	free(Dist);
 	free(Xsq);
 	free(Ysq);
-	free(ids);
 }
 
 
