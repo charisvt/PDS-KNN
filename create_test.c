@@ -7,7 +7,7 @@ int main(int argc, int **argv){
     int N = atoi(argv[1]);
     int D = atoi(argv[2]);
     if(argc<3){
-        printf("pass args dummy :)");
+        fprintf(stderr, "pass args");
         return 0;
     }
     srand(time(NULL));
